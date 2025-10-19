@@ -181,6 +181,16 @@ class ConfigDictConverter:
 
             self.env_dict = {k: v for k, v in self.env_dict.items() if k in env_key_lst}
             self.env_dict['env_type'] = 'rl'
+        
+        elif 'gym_pendulum' in config_dict['env'].lower():
+            import gym
+            from envs.drift_env import ContinuousDriftWrapper
+            self.env_class = lambda **kwargs: ContinuousDriftWrapper(
+                gym.make("Pendulum-v1", render_mode="rgb_array"),
+                param_name="gravity",
+                drift_rate=config_dict.get('drift_rate', 2e-5)
+            )
+            self.env_dict = {'env': 'gym_pendulum', 'env_type': 'rl', 'seed': config_dict.get('seed', 123)}
 
         else:
             raise AssertionError("config dict converter: env doesn't match" + config_dict['env'])
@@ -259,7 +269,9 @@ def main():
     parser.add_argument('--algorithm', type=str, default='parseval', help='Learning algorithm to run for the experiment')
     parser.add_argument('--base_algorithm', type=str, default='ppo_agent', help='Base algorithm for the agent')
     parser.add_argument('--repeat_idx', type=int, default=0, help='Index of the repeat (for multiple runs)')
-    parser.add_argument('--env', type=str, default='metaworld_sequence_set2', help='Environment to run')
+    parser.add_argument('--env', type=str, default='gym_pendulum', help='Environment to run')
+    parser.add_argument('--drift_rate', type=float, default=2e-5, help='Rate of parameter drift per step')
+    parser.add_argument('--drift_param', type=str, default='gravity', help='Which parameter to drift')
     parser.add_argument('--change_freq', type=int, default=1e6, help='Frequency to change tasks in the environment')  # note this is overriden below per environment
     parser.add_argument('--num_steps', type=int, default=10000, help='Num steps to run' )  # note this is overriden below per-enviornment
     parser.add_argument('--seed', type=int, default=123, help='Num steps to run')
@@ -352,6 +364,9 @@ def main():
             args.regen = 0.001
             args.regen_wasserstein = True
 
+        elif args.algorithm == 'ewc':
+            args.ewc_lambda = 1000
+
     elif "lunarlander" in args.env: 
         args.num_steps = 1e7
         args.change_freq = 500000
@@ -429,6 +444,38 @@ def main():
             args.regen = 0.01
             
         elif args.algorithm == 'w-regen':  # wasserstein version
+            args.regen = 0.001
+            args.regen_wasserstein = True
+
+    elif "gym_" in args.env:
+        # ✅ default hyperparameters for continuous Gym control environments (Pendulum, MountainCar, etc.)
+        args.num_steps = 1e6
+        args.change_freq = int(args.num_steps)  # No discrete task switch — continuous drift
+
+        # PPO training defaults
+        args.rollout_num_steps = 2048  
+        args.num_minibatches = 32  
+        args.update_epochs = 10  
+        args.minibatch_size = 64  
+        args.ent_coef = 0.001
+        args.rpo_alpha = 0
+        args.learning_rate = 3e-4
+
+        # Parseval and EWC hyperparameters
+        if args.algorithm == 'base':
+            pass
+        elif args.algorithm == 'parseval':
+            args.parseval_reg = 0.001
+        elif args.algorithm == 'ewc':
+            args.ewc_lambda = 1000
+        elif args.algorithm == 'layer_norm':
+            args.layer_norm = True
+        elif args.algorithm == 'snp':
+            args.perturb = 0.001
+            args.weight_decay = 0.001
+        elif args.algorithm == 'regen':
+            args.regen = 0.001
+        elif args.algorithm == 'w-regen':
             args.regen = 0.001
             args.regen_wasserstein = True
 

@@ -451,7 +451,7 @@ class PPO_Agent:
             logged_values['critic_grad_norm'] = critic_norm.item()
 
             ### params and gradients singular values
-            actor_gradient_singular_valkues = []
+            actor_gradient_singular_values = []
             actor_singular_values = []
             for name, param in self.agent_networks.actor_mean.named_parameters():
                 if 'weight' in name and 'linear' in name:
