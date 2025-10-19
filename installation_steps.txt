@@ -1,0 +1,12 @@
+conda create -n ARS python=3.10.15
+conda activate ARS
+
+git clone https://github.com/automl/CARL.git --recursive
+cd CARL
+pip install .
+
+cd ..
+pip install metaworld
+git clone https://github.com/wechu/parseval_reg.git
+pip install -r reqs.txt
+pip install torch torchaudio torchvision
