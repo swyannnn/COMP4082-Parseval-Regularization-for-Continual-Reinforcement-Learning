@@ -18,7 +18,7 @@ def run_many(arguments_list, test_run=False):
     bash_script_content = "#!/bin/bash\n\n"
     
     for arg in arguments_list:
-        bash_script_content += f"python main.py {arg}{' --test_run' if test_run else ''} &\n"
+        bash_script_content += f"python main_ori.py {arg}{' --test_run' if test_run else ''} &\n"
 
 
     with open(bash_filename, "w") as file:
