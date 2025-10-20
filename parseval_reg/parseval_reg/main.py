@@ -8,6 +8,7 @@ import sys, os
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
 import torch 
 import numpy as np
+import gymnasium as gym
 
 import argparse
 import time
@@ -183,7 +184,6 @@ class ConfigDictConverter:
             self.env_dict['env_type'] = 'rl'
         
         elif 'gym_pendulum_drift' in config_dict['env'].lower():
-            import gym
             from envs.drift_env import ContinuousDriftWrapper
             self.env_class = lambda **kwargs: ContinuousDriftWrapper(
                 gym.make("Pendulum-v1", render_mode="rgb_array"),
@@ -193,7 +193,6 @@ class ConfigDictConverter:
             self.env_dict = {'env': 'gym_pendulum', 'env_type': 'rl', 'seed': config_dict.get('seed', 123)}
 
         elif 'gym_pendulum_discrete' in config_dict['env'].lower():
-            import gym
             from envs.drift_env import DiscreteDriftWrapper
             self.env_class = lambda **kwargs: DiscreteDriftWrapper(
                 gym.make("Pendulum-v1", render_mode=None),
