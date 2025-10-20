@@ -1,3 +1,4 @@
+import torch
 import gym
 import numpy as np
 import matplotlib.pyplot as plt
@@ -36,19 +37,19 @@ class ContinuousDriftWrapper(gym.Wrapper):
     def render(self):
         return self.env.render()
 
-
     def _apply_drift(self):
         self.t += 1
         if self.oscillate:
-            # sinusoidal drift between bounds
-            val = (self.drift_range[1] - self.drift_range[0]) / 2 * np.sin(self.drift_rate * self.t) \
-                  + np.mean(self.drift_range)
+            # # sinusoidal drift between bounds
+            # val = (self.drift_range[1] - self.drift_range[0]) / 2 * np.sin(self.drift_rate * self.t) \
+            #       + np.mean(self.drift_range)
+            val = 9.81
         else:
-            val = self.param_val + self.drift_rate
+            # val = self.param_val + self.drift_rate
+            val = 9.81
         setattr(self.env, self.param_name, float(val))
 
     def evaluate_agent(self, agent, num_eval_runs=5, render=True):
-        import torch
         """Simple evaluation loop for Gym environments (handles scalars, tensors, etc.)."""
         episodic_returns = []
         for _ in range(num_eval_runs):
@@ -85,4 +86,85 @@ class ContinuousDriftWrapper(gym.Wrapper):
         return {
             "episodic_returns": episodic_returns,
             "successes": np.zeros(num_eval_runs),  # for consistency
+        }
+
+class DiscreteDriftWrapper(gym.Wrapper):
+    def __init__(self, env, param_name="gravity", task_values=(5.0, 10.0, 15.0), change_freq=50000):
+        super().__init__(env)
+        self.param_name = param_name
+        self.task_values = task_values
+        self.change_freq = change_freq
+        self.current_task_idx = 0
+        self.t = 0
+        setattr(self.env, self.param_name, self.task_values[self.current_task_idx])
+        print(f"[DiscreteDriftWrapper] {param_name}={self.task_values[0]} (freq={change_freq})")
+
+    def step(self, action):
+        # ✅ Handle all possible action formats
+        if torch.is_tensor(action):
+            action = action.detach().cpu().numpy()
+        if np.isscalar(action):
+            action = np.array([action], dtype=np.float32)
+        elif isinstance(action, np.ndarray) and action.shape == ():
+            action = np.expand_dims(action, axis=0).astype(np.float32)
+        obs, reward, done, truncated, info = self.env.step(action)
+        self.t += 1
+
+        # switch task every change_freq steps
+        if self.t % self.change_freq == 0:
+            self.current_task_idx = (self.current_task_idx + 1) % len(self.task_values)
+            new_val = self.task_values[self.current_task_idx]
+            setattr(self.env, self.param_name, new_val)
+            print(f"[DiscreteDriftWrapper] Switched to gravity={new_val}")
+
+        return obs.astype(np.float32), np.float32(reward), done, truncated, info
+
+    def reset(self, **kwargs):
+        return self.env.reset(**kwargs)
+
+    def render(self):
+        return self.env.render()
+
+    def evaluate_agent(self, agent, num_eval_runs=5, render=True):
+        """Evaluate the trained agent across all discrete gravity settings."""
+        episodic_returns = []
+        gravity_values = []
+
+        for gravity in self.task_values:
+            setattr(self.env, self.param_name, gravity)
+            print(f"[Eval] gravity={gravity}")
+            for _ in range(num_eval_runs):
+                obs, info = self.reset()
+                done = False
+                total_reward = 0
+                steps = 0
+                while not done and steps < 1000:
+                    # Get action from agent
+                    action = agent.act(obs)
+                    if torch.is_tensor(action):
+                        action = action.detach().cpu().numpy()
+                    if np.isscalar(action):
+                        action = np.array([action], dtype=np.float32)
+                    elif isinstance(action, np.ndarray) and action.shape == ():
+                        action = np.expand_dims(action, axis=0).astype(np.float32)
+
+                    obs, reward, done, truncated, info = self.env.step(action)
+                    total_reward += reward
+                    steps += 1
+
+                    if render:
+                        frame = self.env.render()
+                        plt.imshow(frame)
+                        plt.axis("off")
+                        plt.pause(0.001)
+                        plt.clf()
+
+                episodic_returns.append(total_reward)
+                gravity_values.append(gravity)
+
+        # Return structure compatible with main.py expectations
+        return {
+            "episodic_returns": episodic_returns,
+            "successes": np.zeros(len(episodic_returns)),
+            "gravity_values": gravity_values
         }

@@ -182,7 +182,7 @@ class ConfigDictConverter:
             self.env_dict = {k: v for k, v in self.env_dict.items() if k in env_key_lst}
             self.env_dict['env_type'] = 'rl'
         
-        elif 'gym_pendulum' in config_dict['env'].lower():
+        elif 'gym_pendulum_drift' in config_dict['env'].lower():
             import gym
             from envs.drift_env import ContinuousDriftWrapper
             self.env_class = lambda **kwargs: ContinuousDriftWrapper(
@@ -191,6 +191,21 @@ class ConfigDictConverter:
                 drift_rate=config_dict.get('drift_rate', 2e-5)
             )
             self.env_dict = {'env': 'gym_pendulum', 'env_type': 'rl', 'seed': config_dict.get('seed', 123)}
+
+        elif 'gym_pendulum_discrete' in config_dict['env'].lower():
+            import gym
+            from envs.drift_env import DiscreteDriftWrapper
+            self.env_class = lambda **kwargs: DiscreteDriftWrapper(
+                gym.make("Pendulum-v1", render_mode=None),
+                param_name="gravity",
+                task_values=(5.0, 10.0, 15.0),
+                change_freq=50000
+            )
+            self.env_dict = {
+                'env': 'gym_pendulum_discrete',
+                'env_type': 'rl',
+                'seed': config_dict.get('seed', 123)
+            }
 
         else:
             raise AssertionError("config dict converter: env doesn't match" + config_dict['env'])
@@ -599,7 +614,8 @@ def main():
             save_metrics = {}
             # eval
             num_eval_runs = 10
-            eval_results = env.evaluate_agent(agent, num_eval_runs)
+            eval_results = env.evaluate_agent(agent, num_eval_runs, render=False)
+            print("gravity_values")
             eval_episode_returns = eval_results['episodic_returns']
             save_metrics['runtime'] = (time.perf_counter() - start_time) / 60  # time in mins
 
