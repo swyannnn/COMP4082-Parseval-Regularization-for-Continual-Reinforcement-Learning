@@ -1,6 +1,8 @@
-parseval_reg/parseval_reg/results*
+output
 parseval_reg/parseval_reg/envs/__pycache__
 parseval_reg/parseval_reg/__pycache__
 parseval_reg/parseval_reg/run_many.sh
 CARL
+results
+run_many.sh
 

@@ -10,3 +10,4 @@ pip install metaworld
 git clone https://github.com/wechu/parseval_reg.git
 pip install -r reqs.txt
 pip install torch torchaudio torchvision
+conda/pip install tensorboard
