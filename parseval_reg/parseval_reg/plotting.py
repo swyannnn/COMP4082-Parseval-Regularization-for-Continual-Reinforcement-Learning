@@ -6,6 +6,7 @@
 
 
 
+import os
 import numpy as np
 import matplotlib.pyplot as plt
 import scipy.stats
@@ -25,8 +26,10 @@ def _generate_default_file_paths(algorithm_used, env_used, num_repeats, num_task
         env_names = ['gridworld_ninerooms']  # gridworld randomizes the tasks for every run, so just use more repeats instead (e.g. 20)
 
     file_paths = []
-    for env, i_repeat in product(env_names, range(num_repeats)):
-        file_paths.append(f"{base_folder}data_{env}_{algorithm_used}_{i_repeat}.pkl")
+    for folder in os.listdir(base_folder):
+        for env, i_repeat in product(env_names, range(num_repeats)):
+            print(f"{base_folder}/{folder}/{env}_{algorithm_used}_{i_repeat}.pkl")
+            # file_paths.append(f"{base_folder}/{folder}/{env}_{algorithm_used}_{i_repeat}.pkl")
 
     return file_paths
 
@@ -197,7 +200,7 @@ def plot_performance_profile(load_path, algorithms_used_list, env, save_freq=Non
 
         x = np.sort(a)
         y = 1 - np.arange(len(x)) / float(len(x))
-        plots = plt.plot(x, y, label=env, **default_plot_params)
+        plots = plt.plot(x, y, label=algorithm, **default_plot_params)
 
         ## try addingconfidence band using DKW
         confidence_level = 0.1
@@ -257,7 +260,7 @@ def _group_into_tasks(data, num_tasks):
 
 
 if __name__ == '__main__':
-    test_run = True  # if you want to plot for a test run, set this to true
+    test_run = False  # if you want to plot for a test run, set this to true
     if test_run:
         num_task_sequences = 1
         num_repeats = 1
@@ -268,16 +271,16 @@ if __name__ == '__main__':
         algorithms_used_list = ['base', 'parseval']
         env = 'metaworld'
         # use defautls
-        num_task_sequences = None
-        num_repeats = None
-        save_freq = None
+        num_task_sequences = 1
+        num_repeats = 1
+        save_freq = 25000
 
-    plot_learning_curves('results/', ['base', 'parseval'], env,
-                          num_repeats=num_repeats, num_task_sequences=num_task_sequences, save_freq=save_freq,
-                          plot_save_path='')
-    # plot_performance_profile('results/', ['base', 'parseval'], 'metaworld', 
-    #                          change_freq=2e3, num_steps=10e3, 
-    #                          plot_save_path='')
+    # plot_learning_curves('results/', ['base', 'parseval'], env,
+    #                       num_repeats=num_repeats, num_task_sequences=num_task_sequences, save_freq=save_freq,
+    #                       plot_save_path='')
+    plot_performance_profile('/media/nine/HD_1/HD_2_from_seven/Yann/robotics/COMP4082_ARS/results', ['base', 'parseval'], 'metaworld', 
+                             save_freq=save_freq, change_freq=1e5, num_steps=1e6, 
+                             plot_save_path='')
 
 
 
