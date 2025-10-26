@@ -256,6 +256,7 @@ class RLLogger:
 
     def save_metrics(self, option, agent=None, loss=None, episode_return=None, save_path="", save_tag="", *args,
                      **kwargs):
+        os.makedirs(os.path.join(save_path, 'models'), exist_ok=True)
         # save model
         if option == 'standard':
             self.metrics['loss'].append(loss)
@@ -485,7 +486,7 @@ def main():
 
     elif "gym_" in args.env:
         # ✅ default hyperparameters for continuous Gym control environments (Pendulum, MountainCar, etc.)
-        args.num_steps = 1e6
+        args.num_steps = 1e7
         args.change_freq = int(args.num_steps)  # No discrete task switch — continuous drift
 
         # PPO training defaults
@@ -493,9 +494,9 @@ def main():
         args.num_minibatches = 32  
         args.update_epochs = 10  
         args.minibatch_size = 64  
-        args.ent_coef = 0.001
+        args.ent_coef = 0.01
         args.rpo_alpha = 0
-        args.learning_rate = 3e-4
+        args.learning_rate = 0.00025
 
         # Parseval and EWC hyperparameters
         if args.algorithm == 'base':
@@ -661,14 +662,15 @@ def main():
                 eval_successes = eval_results['successes']
                 save_metrics['mean_eval_success'] = np.mean(eval_successes)
                 save_metrics['std_eval_success'] = np.std(eval_successes, ddof=1)
-                save_metrics['min_eval_success'] = np.min(eval_successes)
-                save_metrics['max_eval_success'] = np.max(eval_successes)
-                # save_metrics['task_counter'] = env.task_counter
+                save_metrics['task_counter'] = env.task_counter
 
                 # save the obs normalization stats
                 if hasattr(env, 'obs_mean'):
                     save_metrics['obs_running_mean'] = env.obs_mean
                     save_metrics['obs_running_var'] = env.obs_var
+
+                writer.add_scalar("eval/mean_success", save_metrics['mean_eval_success'], i_step)
+                writer.add_scalar("eval/std_success", save_metrics['std_eval_success'], i_step)
 
                 print(f"{i_step} success {round(save_metrics['mean_eval_success'],3)} +/- {round(save_metrics['std_eval_success']/np.sqrt(num_eval_runs),3)}")
 
@@ -677,7 +679,7 @@ def main():
                 save_metrics['obs_running_mean'] = env.obs_mean
                 save_metrics['obs_running_var'] = env.obs_var
 
-            if 'gridworld' in env_parameters['env']:
+            elif 'gridworld' in env_parameters['env']:
                 # print(obs, obs.shape)
                 save_metrics['goal_location'] = env.goal_states[0][0]
 
@@ -688,16 +690,20 @@ def main():
                 save_metrics['optimal_eval_steps_one_room'] = optimal_length_one_room
                 print(f"{i_step} eval steps mean {save_metrics['mean_eval_steps']} best {save_metrics['best_eval_steps']} optimal {optimal_length_one_room}")
 
-            print(f"{i_step} eval return {round(save_metrics['mean_eval_return'],3)} +/- {round(save_metrics['std_eval_return']/np.sqrt(num_eval_runs),3)}")
-            metric_logger.save_metrics('eval', **save_metrics, save_path=save_path)
+            elif 'gym_' in env_parameters['env']:
+                eval_successes = eval_results['successes']
+                save_metrics['mean_eval_success'] = np.mean(eval_successes)
+                save_metrics['std_eval_success'] = np.std(eval_successes, ddof=1)
+                writer.add_scalar("eval/mean_success", save_metrics['mean_eval_success'], i_step)
+                writer.add_scalar("eval/std_success", save_metrics['std_eval_success'], i_step)
+                print(f"{i_step} success {round(save_metrics['mean_eval_success'],3)} +/- {round(save_metrics['std_eval_success']/np.sqrt(num_eval_runs),3)}")
+
             writer.add_scalar("eval/mean_return", save_metrics['mean_eval_return'], i_step)
             writer.add_scalar("eval/std_return", save_metrics['std_eval_return'], i_step)
             writer.add_scalar("eval/min_return", save_metrics['min_eval_return'], i_step)
             writer.add_scalar("eval/max_return", save_metrics['max_eval_return'], i_step)
-            writer.add_scalar("eval/mean_success", save_metrics['mean_eval_success'], i_step)
-            writer.add_scalar("eval/std_success", save_metrics['std_eval_success'], i_step)
-            writer.add_scalar("eval/min_eval_success", save_metrics['min_eval_success'], i_step)
-            writer.add_scalar("eval/max_eval_success", save_metrics['max_eval_success'], i_step)
+            print(f"{i_step} eval return {round(save_metrics['mean_eval_return'],3)} +/- {round(save_metrics['std_eval_return']/np.sqrt(num_eval_runs),3)}")
+            metric_logger.save_metrics('eval', **save_metrics, save_path=save_path)
 
         if metric_logger.save_model_freq > 0:  # there's an option not to save models
             if (i_step+1) % metric_logger.save_model_freq == 0:

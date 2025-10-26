@@ -23,6 +23,12 @@ class ContinuousDriftWrapper(gym.Wrapper):
 
         obs, reward, done, truncated, info = self.env.step(action)
 
+        # ✅ Define success criterion
+        theta_cos, theta_sin, theta_dot = obs
+        upright = theta_cos > 0.95
+        stable = abs(theta_dot) < 0.5
+        info["success"] = int(upright and stable)
+
         # ✅ Cast everything to float32 to avoid MPS dtype errors
         obs = obs.astype(np.float32)
         reward = np.float32(reward)
@@ -40,18 +46,17 @@ class ContinuousDriftWrapper(gym.Wrapper):
     def _apply_drift(self):
         self.t += 1
         if self.oscillate:
-            # # sinusoidal drift between bounds
-            # val = (self.drift_range[1] - self.drift_range[0]) / 2 * np.sin(self.drift_rate * self.t) \
-            #       + np.mean(self.drift_range)
-            val = 9.81
+            val = (self.drift_range[1] - self.drift_range[0]) / 2 * np.sin(self.drift_rate * self.t) \
+                + np.mean(self.drift_range)
         else:
-            # val = self.param_val + self.drift_rate
-            val = 9.81
+            val = np.clip(self.param_val + self.drift_rate * self.t, *self.drift_range)
+        # print(f"[ContinuousDriftWrapper] Step {self.t}: Setting {self.param_name} to {val:.4f}")
         setattr(self.env, self.param_name, float(val))
 
     def evaluate_agent(self, agent, num_eval_runs=5, render=True):
         """Simple evaluation loop for Gym environments (handles scalars, tensors, etc.)."""
         episodic_returns = []
+        successes = []
         for _ in range(num_eval_runs):
             obs, info = self.reset()
             done = False
@@ -71,6 +76,7 @@ class ContinuousDriftWrapper(gym.Wrapper):
 
                 obs, reward, done, truncated, info = self.env.step(action)
                 total_reward += reward
+                successes.append(info.get("success", 0))
                 steps += 1
 
                 if render:
@@ -82,10 +88,9 @@ class ContinuousDriftWrapper(gym.Wrapper):
 
             episodic_returns.append(total_reward)
 
-        # ✅ Return structure compatible with Parseval repo
         return {
             "episodic_returns": episodic_returns,
-            "successes": np.zeros(num_eval_runs),  # for consistency
+            "successes": successes, 
         }
 
 class DiscreteDriftWrapper(gym.Wrapper):
@@ -129,7 +134,7 @@ class DiscreteDriftWrapper(gym.Wrapper):
         """Evaluate the trained agent across all discrete gravity settings."""
         episodic_returns = []
         gravity_values = []
-
+        successes = []
         for gravity in self.task_values:
             setattr(self.env, self.param_name, gravity)
             print(f"[Eval] gravity={gravity}")
@@ -150,6 +155,7 @@ class DiscreteDriftWrapper(gym.Wrapper):
 
                     obs, reward, done, truncated, info = self.env.step(action)
                     total_reward += reward
+                    successes.append(info.get("success", 0))
                     steps += 1
 
                     if render:
@@ -165,6 +171,6 @@ class DiscreteDriftWrapper(gym.Wrapper):
         # Return structure compatible with main.py expectations
         return {
             "episodic_returns": episodic_returns,
-            "successes": np.zeros(len(episodic_returns)),
+            "successes": successes,
             "gravity_values": gravity_values
         }
