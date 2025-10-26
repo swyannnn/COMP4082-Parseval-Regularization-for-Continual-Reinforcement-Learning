@@ -16,9 +16,12 @@ def run_many(arguments_list, test_run=False):
     """
     bash_filename = 'run_many.sh'
     bash_script_content = "#!/bin/bash\n\n"
-    
-    for arg in arguments_list:
-        bash_script_content += f"python main_ori.py {arg}{' --test_run' if test_run else ''} &\n"
+
+    for i, arg in enumerate(arguments_list):
+        if i == arguments_list.__len__() - 1:
+            bash_script_content += f"python parseval_reg/parseval_reg/main.py {arg}{' --test_run' if test_run else ''}\n"
+        else:
+            bash_script_content += f"python parseval_reg/parseval_reg/main.py {arg}{' --test_run' if test_run else ''} &&\n"
 
 
     with open(bash_filename, "w") as file:
@@ -53,7 +56,10 @@ if __name__ == "__main__":
     if args.test_run:
         num_task_sequences = 1
         args.number_of_repeats = 1
-        algorithms_to_run = ['base', 'parseval']
+        algorithms_to_run = ['base', 'parseval', 'snp','layer_norm', 'regen', 'w-regen']
+    else:
+        num_task_sequences = 1
+        algorithms_to_run = ['base', 'parseval', 'snp','layer_norm', 'regen', 'w-regen']
 
     if args.env_to_run == 'metaworld':
         env_names = [f'metaworld_sequence_set{i}' for i in range(num_task_sequences)]  
@@ -78,3 +84,5 @@ if __name__ == "__main__":
     print("Total number of runs: ", len(arguments_list))
 
     run_many(arguments_list, test_run=args.test_run)
+
+# python parseval_reg/parseval_reg/run_many.py --env_to_run metaworld --number_of_repeats 3
