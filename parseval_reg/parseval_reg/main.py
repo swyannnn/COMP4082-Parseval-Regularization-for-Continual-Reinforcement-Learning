@@ -1,17 +1,37 @@
-###
-# 
-#
-#
-###
-
+from datetime import datetime
 import sys, os
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+from torch.utils.tensorboard import SummaryWriter
 import torch 
 import numpy as np
 import gymnasium as gym
+import subprocess
 
 import argparse
 import time
+
+def get_most_free_gpu():
+    """
+    Returns the GPU ID (integer) with the most available memory.
+    Works on multi-GPU systems.
+    """
+    if not torch.cuda.is_available():
+        return None
+
+    try:
+        # Query nvidia-smi for free memory per GPU
+        result = subprocess.run(
+            ['nvidia-smi', '--query-gpu=memory.free', '--format=csv,noheader,nounits'],
+            encoding='utf-8', capture_output=True, check=True
+        )
+        # Parse into list of ints
+        free_mem = [int(x) for x in result.stdout.strip().split('\n')]
+        best_gpu = int(np.argmax(free_mem))
+        print(f"[GPU SELECTOR] Choosing GPU {best_gpu} with {free_mem[best_gpu]} MB free.")
+        return best_gpu
+    except Exception as e:
+        print("Could not query nvidia-smi, defaulting to GPU 0.", e)
+        return 0
 
 class ConfigDictConverter:
     def __init__(self, config_dict):
@@ -195,7 +215,7 @@ class ConfigDictConverter:
         elif 'gym_pendulum_discrete' in config_dict['env'].lower():
             from envs.drift_env import DiscreteDriftWrapper
             self.env_class = lambda **kwargs: DiscreteDriftWrapper(
-                gym.make("Pendulum-v1", render_mode=None),
+                gym.make("Pendulum-v1", render_mode="rgb_array"),
                 param_name="gravity",
                 task_values=(5.0, 10.0, 15.0),
                 change_freq=50000
@@ -250,12 +270,12 @@ class RLLogger:
             for k, v in kwargs.items():
                 self.metrics[k].append(v)
         elif option == 'model':
-            agent.save_model(save_path + f'models/model_{save_tag}_{kwargs.get("total_num_steps")}.pyt')
+            agent.save_model(os.path.join(save_path, 'models', f'model_{save_tag}_{kwargs.get("total_num_steps")}.pyt'))
             print('saved agent')
         elif option == 'states':
             states = kwargs['states']
             import torch
-            torch.save(states, save_path + f'models/states_{save_tag}_{kwargs.get("total_num_steps")}.pt')
+            torch.save(states, os.path.join(save_path, 'models', f'states_{save_tag}_{kwargs.get("total_num_steps")}.pt'))
             print('saved states')
 
     def reset(self):
@@ -263,9 +283,10 @@ class RLLogger:
 
     def save_to_file(self, save_path, save_tag):
         os.makedirs(save_path, exist_ok=True)
+        file_path = os.path.join(save_path, f"data_{save_tag}.pkl")
 
         # np.save(save_path + f'data_{save_tag}.npy', self.metrics)
-        with open(save_path + f'data_{save_tag}.pkl', 'wb') as file:
+        with open(file_path, 'wb') as file:
             pickle.dump(self.metrics, file, protocol=pickle.HIGHEST_PROTOCOL)
 
     def plot_summary(self):
@@ -274,7 +295,7 @@ class RLLogger:
 
 
 
-
+# python parseval_reg/parseval_reg/main.py --env gym_pendulum_discrete --algorithm base --num_steps 100000 --ent_coef 0.01 --learning_rate 0.001 --render
 def main():
     parser = argparse.ArgumentParser(description='Run RL experiments')
     parser.add_argument('--test_run', action='store_true', help='Run a test run with only 10k steps and eval/save every 2k steps')
@@ -292,6 +313,7 @@ def main():
     parser.add_argument('--save_path', type=str, default='results/', help='Path to the folder to be saved in')
     parser.add_argument('--save_freq', type=int, default=25000, help='Number steps between recording metrics')
     parser.add_argument('--save_model_freq', type=int, default=-1, help='Number of steps between saving the model. Set to -1 for never. ')
+    parser.add_argument('--render', action='store_true', help='Render the environment during training')
     
 
     # Arguments for PPO/RPO
@@ -504,11 +526,14 @@ def main():
     if torch.backends.mps.is_available():
         device = torch.device("mps")
     elif torch.cuda.is_available():
-        device = torch.device("cuda")
+        gpu_id = get_most_free_gpu()
+        device = torch.device(f"cuda:{gpu_id}")
     else:
         device = torch.device("cpu")
     print("Using device:", device)
     args.device = device
+
+    time.sleep(5)  # wait for a bit to avoid potential GPU allocation issues
 
     # initialize config
     save_tag = f"{args.env}_{args.algorithm}_{args.repeat_idx}"
@@ -516,7 +541,12 @@ def main():
     agent_parameters = config_obj.agent_dict
     env_parameters = config_obj.env_dict
     num_steps_per_run = args.num_steps
-    save_path = args.save_path
+    
+    now = datetime.now()
+    date_time = now.strftime("%Y%m%d_%H%M%S")
+    save_path = os.path.join(args.save_path, f"{date_time}_{save_tag}")
+    # save_path = args.save_path
+    print("Save path:", save_path)
 
     print(f"Start RL run!")
     print(agent_parameters)
@@ -533,13 +563,16 @@ def main():
     metric_logger = RLLogger(args.save_freq, args.save_model_freq)
     metric_logger.reset()  # reset for run
 
+    # initialize TensorBoard writer
+    os.makedirs(save_path, exist_ok=True)
+    writer = SummaryWriter(log_dir=save_path)
 
     env = config_obj.env_class(**env_parameters)
 
     agent_parameters.update({"env": env})  # use 'env' to pass to agent
     agent_parameters.update({"device": device})
     agent = config_obj.agent_class(**agent_parameters)
-
+ 
     obs, _ = env.reset()  # match the gymnasium interface
 
     i_step = 0
@@ -569,14 +602,15 @@ def main():
                 if "episode" not in info:
                     continue
 
-                # print(f"global_step={i_step}, episodic_return={info['episode']['r']}")
-                # writer.add_scalar("charts/episodic_return", info["episode"]["r"], global_step)
-                # writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
+                print(f"global_step={i_step}, episodic_return={info['episode']['r']}")
+                writer.add_scalar("charts/episodic_return", info["episode"]["r"], i_step)
+                writer.add_scalar("charts/episodic_length", info["episode"]["l"], i_step)
                 episode_metrics = {}
 
                 metric_logger.save_metrics('episode',
                                                 episode_return=info['episode']['r'],
-                                                episode_length=info['episode']['l'])
+                                                episode_length=info['episode']['l'],
+                                                save_path=save_path)
                 break
 
         ## For single (non-vector) envs
@@ -586,7 +620,8 @@ def main():
                     print(f"global_step={i_step}, episodic_return={infos['episode']['r']}")
 
                 temp_online_return = infos['episode']['r']
-                metric_logger.save_metrics('episode', episode_return=temp_online_return, step=i_step)
+                metric_logger.save_metrics('episode', episode_return=temp_online_return, step=i_step, save_path=save_path)
+                writer.add_scalar("episode/return", temp_online_return, i_step)
 
             if terminateds or truncateds:
                 obs, _ = env.reset()
@@ -596,24 +631,24 @@ def main():
             # print(f"global_step={i_step}, episodic_return={infos['episode']['r']}")
 
             save_metrics = {}
-
             if agent_parameters['base_algorithm'] == 'ppo_agent':
                 if agent.explained_var is not None:
                     save_metrics['explained_var'] = agent.explained_var
                     save_metrics['entropy'] = agent.entropy
                     logged_values = agent.get_log_quantities()
                     save_metrics.update(logged_values)
-                    metrics = ['loss', 'actor_matrix_stable_rank', 'critic_matrix_stable_rank', 'actor_weight_norms', 'critic_weight_norms']
-                    # print({k:v for k,v in save_metrics.items() if k in metrics})
-                #
-                metric_logger.save_metrics('standard', **save_metrics)
+                    # Write to TensorBoard
+                    for k, v in save_metrics.items():
+                        if isinstance(v, (float, int, np.floating, np.integer)):
+                            writer.add_scalar(f"train/{k}", v, i_step)
+                metric_logger.save_metrics('standard', **save_metrics, save_path=save_path)
 
-
+        render = args.render
         if i_step == 0 or (i_step + 1) % metric_logger.save_freq == 0:  # eval step
             save_metrics = {}
             # eval
             num_eval_runs = 10
-            eval_results = env.evaluate_agent(agent, num_eval_runs, render=False)
+            eval_results = env.evaluate_agent(agent, num_eval_runs, render=render)
             print("gravity_values")
             eval_episode_returns = eval_results['episodic_returns']
             save_metrics['runtime'] = (time.perf_counter() - start_time) / 60  # time in mins
@@ -626,6 +661,8 @@ def main():
                 eval_successes = eval_results['successes']
                 save_metrics['mean_eval_success'] = np.mean(eval_successes)
                 save_metrics['std_eval_success'] = np.std(eval_successes, ddof=1)
+                save_metrics['min_eval_success'] = np.min(eval_successes)
+                save_metrics['max_eval_success'] = np.max(eval_successes)
                 # save_metrics['task_counter'] = env.task_counter
 
                 # save the obs normalization stats
@@ -652,12 +689,18 @@ def main():
                 print(f"{i_step} eval steps mean {save_metrics['mean_eval_steps']} best {save_metrics['best_eval_steps']} optimal {optimal_length_one_room}")
 
             print(f"{i_step} eval return {round(save_metrics['mean_eval_return'],3)} +/- {round(save_metrics['std_eval_return']/np.sqrt(num_eval_runs),3)}")
-            metric_logger.save_metrics('eval', **save_metrics)
+            metric_logger.save_metrics('eval', **save_metrics, save_path=save_path)
+            writer.add_scalar("eval/mean_return", save_metrics['mean_eval_return'], i_step)
+            writer.add_scalar("eval/std_return", save_metrics['std_eval_return'], i_step)
+            writer.add_scalar("eval/min_return", save_metrics['min_eval_return'], i_step)
+            writer.add_scalar("eval/max_return", save_metrics['max_eval_return'], i_step)
+            writer.add_scalar("eval/mean_success", save_metrics['mean_eval_success'], i_step)
+            writer.add_scalar("eval/std_success", save_metrics['std_eval_success'], i_step)
+            writer.add_scalar("eval/min_eval_success", save_metrics['min_eval_success'], i_step)
+            writer.add_scalar("eval/max_eval_success", save_metrics['max_eval_success'], i_step)
 
         if metric_logger.save_model_freq > 0:  # there's an option not to save models
             if (i_step+1) % metric_logger.save_model_freq == 0:
-                # extra_log = {}
-
                 metric_logger.save_metrics(option='model',
                                                 agent=agent,
                                                 total_num_steps=(i_step+1),
@@ -684,6 +727,7 @@ def main():
 
     sys.stdout.flush()
     sys.stderr.flush()
+    writer.close()
     return metric_logger
 
 
