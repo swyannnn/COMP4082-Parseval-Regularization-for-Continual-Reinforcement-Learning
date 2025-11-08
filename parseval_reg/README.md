@@ -33,3 +33,12 @@ For running specific configurations, you can use the `main.py` file along with t
  year = {2024}
 }
 ```
+
+
+Instead of switching tasks (like MetaWorld), the environment slowly changes over time, such that:
+
+The optimal policy keeps moving,
+
+The agent must continuously adapt,
+
+There’s no sharp reset in reward or goal — it drifts smoothly.

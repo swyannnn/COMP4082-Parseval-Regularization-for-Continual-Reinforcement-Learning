@@ -4,5 +4,7 @@ parseval_reg/parseval_reg/__pycache__
 parseval_reg/parseval_reg/run_many.sh
 CARL
 results
+results1
 run_many.sh
+*.png
 

@@ -195,12 +195,6 @@ class CARLSingleEnv:
             if "episode" in info:
                 episodic_returns.append(info['episode']['r'])
 
-            # if "final_info" in infos:
-            #     for info in infos["final_info"]:
-            #         if "episode" not in info:
-            #             continue
-            #         # print(f"eval_episode={len(episodic_returns)}, episodic_return={info['episode']['r']}")
-            #         episodic_returns.append(info["episode"]["r"][0])
             obs = next_obs
 
             if terminated or truncated:
@@ -473,13 +467,7 @@ class CARLSequence:
 
             if "episode" in info:
                 episodic_returns.append(info['episode']['r'])
-
-            # if "final_info" in infos:
-            #     for info in infos["final_info"]:
-            #         if "episode" not in info:
-            #             continue
-            #         # print(f"eval_episode={len(episodic_returns)}, episodic_return={info['episode']['r']}")
-            #         episodic_returns.append(info["episode"]["r"][0])
+                
             obs = next_obs
 
             if terminated or truncated:

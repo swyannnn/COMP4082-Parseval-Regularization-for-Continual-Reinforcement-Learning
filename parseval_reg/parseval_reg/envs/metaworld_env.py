@@ -108,13 +108,14 @@ class MetaWorldSingleEnvSequence:
             self.base_task_name = RPO10_SEQ[env_set_id - 1][(self.task_counter - 1) % len(RPO10_SEQ[0])]
             self.base_task_name = self.base_task_name.replace("-v2", "-v3")
 
-            # Create a MetaWorld suite if not already done
-            if self.suite is None:
-                # ML1 uses a single environment; MT50 is multi-task
-                self.suite = metaworld.ML1(self.base_task_name)
+            # # Create a MetaWorld suite if not already done
+            # if self.suite is None:
+            #     # ML1 uses a single environment; MT50 is multi-task
+            #     self.suite = metaworld.ML1(self.base_task_name)
 
             # Get task class dynamically
-            self.base_task_class = self.suite.train_classes[self.base_task_name]
+            self.suite = metaworld.ML1(self.base_task_name)
+            self.base_task_class = self.suite._train_classes[self.base_task_name]
 
         # --- Instantiate the environment ---
         temp_env = self.base_task_class()
@@ -191,7 +192,7 @@ class MetaWorldSingleEnvSequence:
 
         return obs, reward, terminated, truncated, info
 
-    def evaluate_agent(self, agent, num_eval_episodes=10):
+    def evaluate_agent(self, agent, num_eval_episodes=10, render=False):
         ''' Runs and evaluation of the agent
         It runs on the current seed i.e. the current task '''
 
@@ -229,13 +230,7 @@ class MetaWorldSingleEnvSequence:
 
             if "episode" in info:
                 episodic_returns.append(info['episode']['r'])
-
-            # if "final_info" in infos:
-            #     for info in infos["final_info"]:
-            #         if "episode" not in info:
-            #             continue
-            #         # print(f"eval_episode={len(episodic_returns)}, episodic_return={info['episode']['r']}")
-            #         episodic_returns.append(info["episode"]["r"][0])
+                
             obs = next_obs
 
             if terminated or truncated:

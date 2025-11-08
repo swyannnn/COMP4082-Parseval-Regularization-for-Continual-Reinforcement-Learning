@@ -5,7 +5,6 @@
 #####
 
 
-
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -24,13 +23,15 @@ def _generate_default_file_paths(algorithm_used, env_used, num_repeats, num_task
         env_names = [f"carl_sequence_lunarlander_{i}" for i in range(num_task_sequences)]  
     elif env_used == 'gridworld':
         env_names = ['gridworld_ninerooms']  # gridworld randomizes the tasks for every run, so just use more repeats instead (e.g. 20)
-
+    elif env_used == 'gym_pendulum':
+        env_names = [f"gym_pendulum_discrete" for i in range(num_task_sequences)]
+    all_folder = os.listdir(base_folder)
     file_paths = []
-    for folder in os.listdir(base_folder):
-        for env, i_repeat in product(env_names, range(num_repeats)):
-            print(f"{base_folder}/{folder}/{env}_{algorithm_used}_{i_repeat}.pkl")
-            # file_paths.append(f"{base_folder}/{folder}/{env}_{algorithm_used}_{i_repeat}.pkl")
-
+    for env, i_repeat in product(env_names, range(num_repeats)):
+        target = f"{env}_{algorithm_used}_{i_repeat}"
+        folder = [v for v in all_folder if target in v][0]
+        file_paths.append(f"{base_folder}{folder}/data_{env}_{algorithm_used}_{i_repeat}.pkl")
+    print("Generated file paths: ", file_paths)
     return file_paths
 
 def load_results_for_one_alg_and_env(algorithm_used, env_used, num_repeats, num_task_sequences, base_folder='results/'):
@@ -75,7 +76,7 @@ def iqm_error_bars(data, axis=0):
     return lower_curve, upper_curve 
 
 
-def plot_learning_curves(load_path, algorithms_used_list, env, num_task_sequences=None, num_repeats=None, save_freq=None, running_mean_window=0, plot_save_path=None):
+def plot_learning_curves(load_path, algorithms_used_list, env, num_task_sequences=None, num_repeats=None, save_freq=None, running_mean_window=100, plot_save_path=None):
 
     """ This function plots the learning curves
     algorithms_used_list: list of algorithms used in the experiments e.g. ['base', 'parseval']
@@ -97,14 +98,14 @@ def plot_learning_curves(load_path, algorithms_used_list, env, num_task_sequence
     # Metric to plot
     if env in ('metaworld', 'gridworld'):
         metric = "mean_eval_success"  # 
-    elif env in ('carl_dmcquadruped', 'carl_lunarlander'):
+    elif env in ('carl_dmcquadruped', 'carl_lunarlander', 'gym_pendulum'):
         metric = "mean_eval_return"
     else:
         raise AssertionError('Invalid env', env)
 
     ### default plot parameters
     if save_freq is None:
-        if env in ('metaworld', 'carl_lunarlander', 'carl_dmcquadruped'):
+        if env in ('metaworld', 'carl_lunarlander', 'carl_dmcquadruped', 'gym_pendulum'):
             save_freq = 25000
         elif env == 'gridworld':
             save_freq = 5000
@@ -142,7 +143,7 @@ def plot_learning_curves(load_path, algorithms_used_list, env, num_task_sequence
             high_curve = mean_smoothing(high_curve, running_mean_window)
 
         plots = plt.plot(xs, mean_curve, label=alg, **default_plot_params)
-        plt.fill_between(xs, low_curve, high_curve, color=plots[0].get_color(), alpha=SHADED_ALPHA)
+        # plt.fill_between(xs, low_curve, high_curve, color=plots[0].get_color(), alpha=SHADED_ALPHA)
 
         if metric == 'mean_eval_success':
             plt.ylim(-0.01, 1.01)
@@ -182,7 +183,7 @@ def plot_performance_profile(load_path, algorithms_used_list, env, save_freq=Non
     
     if env in ('metaworld', 'gridworld'):
         metric = "mean_eval_success"  # 
-    elif env in ('carl_dmcquadruped', 'carl_lunarlander'):
+    elif env in ('carl_dmcquadruped', 'carl_lunarlander', 'gym_pendulum'):
         metric = "mean_eval_return"
     else:
         raise AssertionError('Invalid env', env)
@@ -196,11 +197,12 @@ def plot_performance_profile(load_path, algorithms_used_list, env, save_freq=Non
 
     # plot the performance profile
     for algorithm in algorithms_used_list:
+        print("Plotting performance profile for ", algorithm)
         a = all_grouped_data[algorithm]
 
         x = np.sort(a)
         y = 1 - np.arange(len(x)) / float(len(x))
-        plots = plt.plot(x, y, label=algorithm, **default_plot_params)
+        # plots = plt.plot(x, y, label=algorithm, **default_plot_params)
 
         ## try addingconfidence band using DKW
         confidence_level = 0.1
@@ -213,12 +215,11 @@ def plot_performance_profile(load_path, algorithms_used_list, env, save_freq=Non
         #         y_lower = np.clip(y - err, 0, 1)
         #         y_upper = np.clip(y + err, 0, 1)
 
-        plt.fill_between(x, y_lower, y_upper, color=plots[0].get_color(), alpha=SHADED_ALPHA)
+        # plt.fill_between(x, y_lower, y_upper, color=plots[0].get_color(), alpha=SHADED_ALPHA)
 
     plt.title("Performance Profile for " + env)
     plt.grid(alpha=0.3)
 
-    plt.legend()
     if metric == 'mean_eval_success':
         plt.xlabel("Average Success Rate")
         plt.ylabel("Pr(Success Rate > x)")
@@ -226,6 +227,7 @@ def plot_performance_profile(load_path, algorithms_used_list, env, save_freq=Non
         plt.xlabel("Average Return")
         plt.ylabel("Pr(Return > x)")
 
+    plt.legend()
     plt.show()
     plt.savefig(plot_save_path + f'{env}_performance_profile.png')
 
@@ -269,17 +271,20 @@ if __name__ == '__main__':
     
     else:
         algorithms_used_list = ['base', 'parseval']
-        env = 'metaworld'
+        # env = 'metaworld'
+        env ='gym_pendulum'
         # use defautls
         num_task_sequences = 1
-        num_repeats = 1
-        save_freq = 25000
+        num_repeats = 3
+        save_freq = None
 
-    # plot_learning_curves('results/', ['base', 'parseval'], env,
-    #                       num_repeats=num_repeats, num_task_sequences=num_task_sequences, save_freq=save_freq,
-    #                       plot_save_path='')
-    plot_performance_profile('/media/nine/HD_1/HD_2_from_seven/Yann/robotics/COMP4082_ARS/results', ['base', 'parseval'], 'metaworld', 
-                             save_freq=save_freq, change_freq=1e5, num_steps=1e6, 
+    # plot_learning_curves('results/', ['base', 'parseval', 'layer_norm', 'regen', 'w-regen'], env,
+    plot_learning_curves('results/', ['base', 'parseval'], env,
+                          num_repeats=num_repeats, num_task_sequences=num_task_sequences, save_freq=save_freq,
+                          plot_save_path='')
+    # plot_performance_profile('results/', ['base', 'parseval', 'layer_norm', 'regen', 'w-regen'], env,
+    plot_performance_profile('results/', ['base', 'parseval'], env,
+                             change_freq=1e6, num_steps=1e7,
                              plot_save_path='')
 
 

@@ -215,7 +215,7 @@ class PPO_Agent:
                     nextnonterminal = 1.0 - self.dones[t]
                     nextvalues = self.values[t + 1]
                 delta = self.rewards[t] + self.gamma * nextvalues * nextnonterminal - self.values[t]
-                advantages[t] = lastgaelam = delta + self.gamma * self.gae_lambda * nextnonterminal * lastgaelam
+                advantages[t] = lastgaelkam = delta + self.gamma * self.gae_lambda * nextnonterminal * lastgaelam
             returns = advantages + self.values
 
         ## optimize policy and value network
