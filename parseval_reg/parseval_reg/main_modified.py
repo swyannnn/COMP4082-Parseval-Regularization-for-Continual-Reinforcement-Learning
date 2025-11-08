@@ -175,7 +175,7 @@ class RLLogger:
 
 
 
-# python parseval_reg/parseval_reg/main_modified.py --env gym_continual_pendulum --algorithm parseval --parseval_reg 0.001 --learnable_input_scale True --add_diag_layer True --drift_rate 2e-5 --net_width 64 --net_activation tanh --weight_init orthogonal --repeat_idx 0 --num_steps 10000000
+# python parseval_reg/parseval_reg/main_modified.py --env gym_continual_pendulum --algorithm base --learnable_input_scale True --add_diag_layer True --drift_rate 2e-5 --net_width 64 --net_activation tanh --weight_init orthogonal --repeat_idx 0 --num_steps 10000000
 def main():
     parser = argparse.ArgumentParser(description='Run RL experiments')
     parser.add_argument('--test_run', action='store_true', help='Run a test run with only 10k steps and eval/save every 2k steps')
@@ -376,12 +376,13 @@ def main():
             save_metrics['min_eval_return'] = np.min(eval_episode_returns)
             save_metrics['max_eval_return'] = np.max(eval_episode_returns)
 
-            eval_successes = eval_results['successes']
-            save_metrics['mean_eval_success'] = np.mean(eval_successes)
-            save_metrics['std_eval_success'] = np.std(eval_successes, ddof=1)
-            writer.add_scalar("eval/mean_success", save_metrics['mean_eval_success'], i_step)
-            writer.add_scalar("eval/std_success", save_metrics['std_eval_success'], i_step)
-            print(f"{i_step} success {round(save_metrics['mean_eval_success'],3)} +/- {round(save_metrics['std_eval_success']/np.sqrt(num_eval_runs),3)}")
+            if "successes" in eval_results.keys():
+                eval_successes = eval_results['successes']
+                save_metrics['mean_eval_success'] = np.mean(eval_successes)
+                save_metrics['std_eval_success'] = np.std(eval_successes, ddof=1)
+                writer.add_scalar("eval/mean_success", save_metrics['mean_eval_success'], i_step)
+                writer.add_scalar("eval/std_success", save_metrics['std_eval_success'], i_step)
+                print(f"{i_step} success {round(save_metrics['mean_eval_success'],3)} +/- {round(save_metrics['std_eval_success']/np.sqrt(num_eval_runs),3)}")
 
             writer.add_scalar("eval/mean_return", save_metrics['mean_eval_return'], i_step)
             writer.add_scalar("eval/std_return", save_metrics['std_eval_return'], i_step)

@@ -39,7 +39,7 @@ class PPO_Agent:
                  regen=0.0, regen_wasserstein=False,
                  rpo_alpha=0, net_width=64, net_activation='tanh', init_gain=None,
                  input_scale=1, learnable_input_scale=False,
-                 seed=None):
+                 seed=None, *args, **kwargs):
 
         self.env = env
         self.device = device
