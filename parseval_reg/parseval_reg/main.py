@@ -98,7 +98,7 @@ class ConfigDictConverter:
                                  'network_type', 'add_diag_layer',
                                  'parseval_reg', 'parseval_norm', 'parseval_num_groups',
                                  'l2_init',
-                                 "parseval_last_layer", "rpo_alpha", 'weight_init', 'init_gain',
+                                 "rpo_alpha", 'weight_init', 'init_gain',
                                  'perturb', 'perturb_dist', 'perturb_rotate', 'regen', 'regen_wasserstein',
                                  'net_width', 'net_activation',
                                  'input_scale', 'learnable_input_scale'
@@ -362,7 +362,6 @@ def main():
 
     # Ablations
     parser.add_argument('--parseval_norm', type=bool, default=False, help='Normalize row weight vectors before applying Parseval reg')
-    parser.add_argument('--parseval_last_layer', type=bool, default=False, help='Apply Parseval norm to the last layer')
     parser.add_argument('--parseval_num_groups', type=int, default=1, help='Number of groups for Parseval regularization')
 
 

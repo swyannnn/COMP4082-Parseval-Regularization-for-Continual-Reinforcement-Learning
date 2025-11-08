@@ -187,8 +187,8 @@ def main():
     parser.add_argument('--env', type=str, default='gym_pendulum', help='Environment to run')
     parser.add_argument('--drift_rate', type=float, default=2e-5, help='Rate of parameter drift per step')
     parser.add_argument('--drift_param', type=str, default='gravity', help='Which parameter to drift')
-    parser.add_argument('--change_freq', type=int, default=1e6, help='Frequency to change tasks in the environment')  # note this is overriden below per environment
-    parser.add_argument('--num_steps', type=int, default=10000, help='Num steps to run' )  # note this is overriden below per-enviornment
+    parser.add_argument('--change_freq', type=int, default=1e6, help='Frequency to change tasks in the environment')
+    parser.add_argument('--num_steps', type=int, default=10000, help='Num steps to run' )
     parser.add_argument('--seed', type=int, default=123, help='Num steps to run')
     parser.add_argument('--save_path', type=str, default='results1/', help='Path to the folder to be saved in')
     parser.add_argument('--save_freq', type=int, default=25000, help='Number steps between recording metrics')
@@ -241,7 +241,6 @@ def main():
 
     # Ablations
     parser.add_argument('--parseval_norm', type=bool, default=False, help='Normalize row weight vectors before applying Parseval reg')
-    parser.add_argument('--parseval_last_layer', type=bool, default=False, help='Apply Parseval norm to the last layer')
     parser.add_argument('--parseval_num_groups', type=int, default=1, help='Number of groups for Parseval regularization')
 
 
@@ -297,10 +296,6 @@ def main():
     print(agent_parameters)
     print(env_parameters)
 
-    # TODO check this
-    # if env_parameters['local_run']:
-    #     print("LOCAL RUN")
-
     start_time = time.perf_counter()
 
     # initialize logger, agent, env
@@ -333,7 +328,6 @@ def main():
         actions = agent.act(obs)
         next_obs, rewards, terminateds, truncateds, infos = env.step(actions)
 
-        # TRY NOT TO MODIFY: save data to replay buffer; handle `terminal_observation`
         # also updates parameters
         agent.update(obs, next_obs, actions, rewards, terminateds, truncateds, infos)
 
@@ -354,7 +348,6 @@ def main():
 
         if i_step == 0 or (i_step + 1) % metric_logger.save_freq == 0:
             print('time: ', round((time.perf_counter() - start_time)/60,3), "SPS:", int(i_step / (time.perf_counter() - start_time)))
-            # print(f"global_step={i_step}, episodic_return={infos['episode']['r']}")
 
             save_metrics = {}
             if agent_parameters['base_algorithm'] == 'ppo_agent':
@@ -363,7 +356,6 @@ def main():
                     save_metrics['entropy'] = agent.entropy
                     logged_values = agent.get_log_quantities()
                     save_metrics.update(logged_values)
-                    # Write to TensorBoard
                     for k, v in save_metrics.items():
                         if isinstance(v, (float, int, np.floating, np.integer)):
                             writer.add_scalar(f"train/{k}", v, i_step)
@@ -383,13 +375,13 @@ def main():
             save_metrics['std_eval_return'] = np.std(eval_episode_returns, ddof=1)
             save_metrics['min_eval_return'] = np.min(eval_episode_returns)
             save_metrics['max_eval_return'] = np.max(eval_episode_returns)
-            if 'gym_' not in env_parameters['env']:
-                eval_successes = eval_results['successes']
-                save_metrics['mean_eval_success'] = np.mean(eval_successes)
-                save_metrics['std_eval_success'] = np.std(eval_successes, ddof=1)
-                writer.add_scalar("eval/mean_success", save_metrics['mean_eval_success'], i_step)
-                writer.add_scalar("eval/std_success", save_metrics['std_eval_success'], i_step)
-                print(f"{i_step} success {round(save_metrics['mean_eval_success'],3)} +/- {round(save_metrics['std_eval_success']/np.sqrt(num_eval_runs),3)}")
+
+            eval_successes = eval_results['successes']
+            save_metrics['mean_eval_success'] = np.mean(eval_successes)
+            save_metrics['std_eval_success'] = np.std(eval_successes, ddof=1)
+            writer.add_scalar("eval/mean_success", save_metrics['mean_eval_success'], i_step)
+            writer.add_scalar("eval/std_success", save_metrics['std_eval_success'], i_step)
+            print(f"{i_step} success {round(save_metrics['mean_eval_success'],3)} +/- {round(save_metrics['std_eval_success']/np.sqrt(num_eval_runs),3)}")
 
             writer.add_scalar("eval/mean_return", save_metrics['mean_eval_return'], i_step)
             writer.add_scalar("eval/std_return", save_metrics['std_eval_return'], i_step)

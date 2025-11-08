@@ -34,7 +34,7 @@ class PPO_Agent:
                  weight_decay=0, tuned_adam=False,
                  network_type='mlp',
                  weight_init='orthogonal', add_diag_layer=False,
-                 parseval_reg=0, parseval_norm=False, parseval_last_layer=False, parseval_num_groups=1,
+                 parseval_reg=0, parseval_norm=False, parseval_num_groups=1,
                  perturb=0.0, perturb_dist='xavier',
                  regen=0.0, regen_wasserstein=False,
                  rpo_alpha=0, net_width=64, net_activation='tanh', init_gain=None,
@@ -65,7 +65,6 @@ class PPO_Agent:
         self.tuned_adam = tuned_adam
         self.parseval_reg = parseval_reg
         self.parseval_norm = parseval_norm
-        # self.parseval_last_layer = parseval_last_layer  # removed from uses
         self.parseval_num_groups = parseval_num_groups
         self.rpo_alpha = rpo_alpha
 
