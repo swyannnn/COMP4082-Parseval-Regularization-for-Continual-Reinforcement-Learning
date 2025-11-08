@@ -249,10 +249,9 @@ class ConfigDictConverter:
 import pickle
 from collections import defaultdict
 class RLLogger:
-    def __init__(self, save_freq, save_model_freq=None, config_idx=0):
+    def __init__(self, save_freq, config_idx=0):
         self.metrics = defaultdict(list)
         self.save_freq = save_freq
-        self.save_model_freq = save_model_freq  # how often to save the model checkpoints (less frequent usually)
 
     def save_metrics(self, option, agent=None, loss=None, episode_return=None, save_path="", save_tag="", *args,
                      **kwargs):
@@ -284,9 +283,9 @@ class RLLogger:
 
     def save_to_file(self, save_path, save_tag):
         os.makedirs(save_path, exist_ok=True)
-        file_path = os.path.join(save_path, f"data_{save_tag}.pkl")
+        file_path = os.path.join(save_path, f"{save_tag}.pkl")
 
-        # np.save(save_path + f'data_{save_tag}.npy', self.metrics)
+        # np.save(save_path + f'{save_tag}.npy', self.metrics)
         with open(file_path, 'wb') as file:
             pickle.dump(self.metrics, file, protocol=pickle.HIGHEST_PROTOCOL)
 
@@ -553,14 +552,10 @@ def main():
     print(env_parameters)
     print("Running on gpu:", torch.cuda.is_available())
 
-    # TODO check this
-    # if env_parameters['local_run']:
-    #     print("LOCAL RUN")
-
     start_time = time.perf_counter()
 
     # initialize logger, agent, env
-    metric_logger = RLLogger(args.save_freq, args.save_model_freq)
+    metric_logger = RLLogger(args.save_freq)
     metric_logger.reset()  # reset for run
 
     # initialize TensorBoard writer
@@ -576,12 +571,6 @@ def main():
     obs, _ = env.reset()  # match the gymnasium interface
 
     i_step = 0
-
-    if metric_logger.save_model_freq > 0:  # there's an option not to save models
-        metric_logger.save_metrics(option='model',
-                                        agent=agent,
-                                        total_num_steps=i_step,
-                                        save_path=save_path)
 
     while i_step < num_steps_per_run:
         actions = agent.act(obs)

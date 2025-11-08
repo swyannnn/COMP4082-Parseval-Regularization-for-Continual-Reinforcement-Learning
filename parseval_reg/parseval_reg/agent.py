@@ -39,7 +39,7 @@ class PPO_Agent:
                  regen=0.0, regen_wasserstein=False,
                  rpo_alpha=0, net_width=64, net_activation='tanh', init_gain=None,
                  input_scale=1, learnable_input_scale=False,
-                 seed=None, *args, **kwargs):
+                 seed=None):
 
         self.env = env
         self.device = device
@@ -192,15 +192,6 @@ class PPO_Agent:
         self.update_counter += 1
 
     def _update_parameters(self, next_obs, next_done):
-        ## don't do the following, did in act()
-        # with torch.no_grad():
-        #     action, logprob, _, value = agent.get_action_and_value(next_obs)
-        #     values[step] = value.flatten()
-        # actions[step] = action
-        # logprobs[step] = logprob
-        ##
-
-
         ## compute GAE targets
         with torch.no_grad():
             next_value = self.agent_networks.get_value(next_obs).reshape(1, -1)
@@ -214,7 +205,7 @@ class PPO_Agent:
                     nextnonterminal = 1.0 - self.dones[t]
                     nextvalues = self.values[t + 1]
                 delta = self.rewards[t] + self.gamma * nextvalues * nextnonterminal - self.values[t]
-                advantages[t] = lastgaelkam = delta + self.gamma * self.gae_lambda * nextnonterminal * lastgaelam
+                advantages[t] = lastgaelam = delta + self.gamma * self.gae_lambda * nextnonterminal * lastgaelam
             returns = advantages + self.values
 
         ## optimize policy and value network
@@ -605,7 +596,6 @@ class AgentNetworks(nn.Module):
         # for k, v in locals().items():
         #     print(k, v)
 
-
         num_hidden = net_width
 
         if network_type.lower() == 'mlp':
@@ -769,34 +759,3 @@ class AgentNetworks(nn.Module):
                 ('linear_output', layer_init(nn.Linear(num_hidden, actor_output_dim), gain=0.01)),
             ]))
         return actor_mean, critic
-    
-
-if __name__ == "__main__":
-
-    from envs.gridworld_env import NineRoomsEnv
-    env = NineRoomsEnv()
-    layer_norm=True
-    nets = AgentNetworks(env, layer_norm=layer_norm)
-
-    for name, param in nets.critic.named_parameters():
-        if 'weight' in name and param.requires_grad:
-            if layer_norm and name[0] in ['1', '4']:
-                continue  # have to skip layer norm's parameters
-
-            last_layer = '6'
-            # print(name, param.shape)
-            if name[0] == last_layer:  # last layer
-                scale = 1
-            else:
-                scale = 2  # sqrt(2)**2
-            # weight matrices right multiply by their inputs
-            # print(torch.norm(torch.matmul(param, param.t()) - scale* torch.eye(param.shape[0]), p='fro')**2)
-                # print(torch.matmul(param, param.t()))
-
-            # extract weights this way
-            # only regularize the weights but not the biases
-            # (is that correct?)
-    #
-    # print('second)')
-    # for key, item in nets.actor.state_dict().items():
-    #     print(key, item.shape)
