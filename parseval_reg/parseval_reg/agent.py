@@ -393,10 +393,9 @@ class PPO_Agent:
 
 
         ### for logging
-        y_pred, y_true = b_values.cpu().numpy(), b_returns.cpu().numpy()
-        var_y = np.var(y_true)
-        self.explained_var = np.nan if var_y == 0 else 1 - np.var(y_true - y_pred) / var_y  # evaluates the critic
-        self.entropy = entropy_loss.clone().item()
+        var_y = torch.var(b_returns)
+        self.explained_var = torch.nan if var_y == 0 else 1 - torch.var(b_returns - b_values) / var_y
+        self.explained_var = self.explained_var.item()
 
         # gradients for actor without considering entropy?
 

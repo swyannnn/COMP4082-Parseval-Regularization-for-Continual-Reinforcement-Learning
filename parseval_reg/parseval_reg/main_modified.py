@@ -1,9 +1,11 @@
 import sys, os
 os.environ["PYTORCH_ENABLE_MPS_FALLBACK"] = "1"
+import torch 
+torch.set_num_threads(8)       # number of physical cores you want
+torch.set_num_interop_threads(8)
 from torch.utils.tensorboard import SummaryWriter
 import pickle
 from collections import defaultdict
-import torch 
 import numpy as np
 import gymnasium as gym
 import subprocess
@@ -175,7 +177,7 @@ class RLLogger:
 
 
 
-# python parseval_reg/parseval_reg/main_modified.py --env gym_continual_pendulum --algorithm base --learnable_input_scale True --add_diag_layer True --drift_rate 2e-5 --net_width 64 --net_activation tanh --weight_init orthogonal --repeat_idx 0 --num_steps 10000000
+# python parseval_reg/parseval_reg/main_modified.py --env gym_continual_pendulum --algorithm base --learnable_input_scale True --add_diag_layer True --drift_rate 2e-5 --net_width 64 --net_activation tanh --weight_init orthogonal --repeat_idx 1 --num_steps 10000000
 def main():
     parser = argparse.ArgumentParser(description='Run RL experiments')
     parser.add_argument('--test_run', action='store_true', help='Run a test run with only 10k steps and eval/save every 2k steps')
